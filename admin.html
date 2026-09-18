@@ -255,16 +255,16 @@ async function tgSend(text){
   if(!t||!t.token||!t.chatId){alert('اظبط إعدادات تليجرام الأول (Token + Chat ID)');return false;}
   try{
     const r=await fetch(`https://api.telegram.org/bot${t.token}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:t.chatId,text,parse_mode:'HTML'})});
-    return r.ok;
-  }catch(e){return false;}
+    if(!r.ok){console.warn('Telegram API error',await r.text());return false;}const body=await r.json().catch(()=>({}));return body.ok===true;
+  }catch(e){console.warn('Telegram send failed',e);return false;}
 }
 
 /* ===== LOADERS ===== */
 async function loadAll(){
-  await Promise.all([loadCards(),loadChart(),loadLeaders(),loadGeo(),loadConfig(),loadSuggestions(),loadAlerts(),loadLog(),loadExt()]);
+  await Promise.allSettled([loadCards(),loadChart(),loadLeaders(),loadGeo(),loadConfig(),loadSuggestions(),loadAlerts(),loadLog(),loadExt()]);
 }
 async function poll(){
-  await Promise.all([loadCards(),loadSuggestions(),loadAlerts()]);
+  await Promise.allSettled([loadCards(),loadSuggestions(),loadAlerts()]);
   tgChecks();
   autoReport();
 }
@@ -382,21 +382,21 @@ async function loadLog(){
 }
 
 /* ===== TELEGRAM CHECKS ===== */
-function tgChecks(){
+async function tgChecks(){
   if($('#tgAutoSugg').checked){
-    allSugg.filter(s=>!s.read&&s.status==='pending'&&!tgSentSugg.has(s.id)).forEach(s=>{
-      tgSend(`📬 <b>اقتراح جديد</b>\n👤 ${s.name||'مجهول'} ${s.rating?'('+s.rating+'★)':''}\n💬 ${s.message}`);
-      tgSentSugg.add(s.id); sessionStorage.setItem('eb_tg_sugg',JSON.stringify([...tgSentSugg]));
-    });
+    for(const s of allSugg.filter(s=>!s.read&&s.status==='pending'&&!tgSentSugg.has(s.id))){
+      const ok=await tgSend(`📬 <b>اقتراح جديد</b>\n👤 ${s.name||'مجهول'} ${s.rating?'('+s.rating+'★)':''}\n💬 ${s.message}`);
+      if(ok){tgSentSugg.add(s.id);sessionStorage.setItem('eb_tg_sugg',JSON.stringify([...tgSentSugg]));}
+    }
   }
   if($('#tgAutoAlert').checked){
-    db.collection('alerts').orderBy('ts','desc').limit(3).get().then(snap=>{
-      snap.forEach(d=>{const x=d.data();
+    try{const snap=await db.collection('alerts').orderBy('ts','desc').limit(3).get();
+      for(const d of snap.docs){const x=d.data();
         if(!tgSentAlerts.has(d.id)&&Date.now()-x.ts<120000){
-          tgSend(`🚨 <b>تنبيه عطل</b>\n${x.msg||x.type}`);
-          tgSentAlerts.add(d.id); sessionStorage.setItem('eb_tg_alert',JSON.stringify([...tgSentAlerts]));
-        }});
-    });
+          const ok=await tgSend(`🚨 <b>تنبيه عطل</b>\n${x.msg||x.type}`);
+          if(ok){tgSentAlerts.add(d.id);sessionStorage.setItem('eb_tg_alert',JSON.stringify([...tgSentAlerts]));}
+        }}
+    }catch(e){console.warn('Telegram alert polling failed',e);}
   }
 }
 async function sendReport(){
