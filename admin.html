@@ -420,42 +420,38 @@ function autoReport(){
 }
 
 /* ===== SAVERS ===== */
+function showActionError(e,action){
+  const denied=e&&((e.code||'').includes('permission-denied')||(e.message||'').includes('Missing or insufficient permissions'));
+  const msg=denied?'Firebase رفض الكتابة. تأكد أن حساب الأدمن مصرح له في Firestore Rules: '+((auth.currentUser&&auth.currentUser.email)||'غير معروف'):(e&&e.message)||'تعذر تنفيذ الأمر';
+  const box=$('#actionStatus');box.textContent='❌ '+action+': '+msg;box.className='action-status err';box.classList.remove('hidden');setTimeout(()=>box.classList.add('hidden'),9000);
+  console.error(action,e);return msg;
+}
+async function adminWrite(work,action,button){try{await work();log(action);if(button)flash(button);return true;}catch(e){showActionError(e,action);return false;}}
+
 $('#cfgSave').onclick=async()=>{
   const disabled=[];document.querySelectorAll('[data-mk]').forEach(el=>{if(el.checked)disabled.push(el.dataset.mk);});
-  await db.collection('config').doc('settings').set({
-    maintenance:$('#cfgMaint').checked,maintenanceMsg:$('#cfgMaintMsg').value.trim(),
-    banner:$('#cfgBanner').value.trim(),disableGuide:$('#cfgHideGuide').checked,
-    vip:$('#cfgVip').checked,
-    support:{enabled:$('#cfgSupEn').checked,text:$('#cfgSupText').value.trim(),link:$('#cfgSupLink').value.trim()},
-    disabledMarkets:disabled,updatedAt:Date.now()
-  },{merge:true});
-  log('تعديل الإعدادات الأساسية');flash($('#cfgSave'));
+  await adminWrite(()=>db.collection('config').doc('settings').set({maintenance:$('#cfgMaint').checked,maintenanceMsg:$('#cfgMaintMsg').value.trim(),banner:$('#cfgBanner').value.trim(),disableGuide:$('#cfgHideGuide').checked,vip:$('#cfgVip').checked,support:{enabled:$('#cfgSupEn').checked,text:$('#cfgSupText').value.trim(),link:$('#cfgSupLink').value.trim()},disabledMarkets:disabled,updatedAt:Date.now()},{merge:true}),'تعديل الإعدادات الأساسية',$('#cfgSave'));
 };
 $('#inboxSave').onclick=async()=>{
-  await db.collection('config').doc('settings').set({inbox:{active:$('#cfgInboxEn').checked,text:$('#cfgInboxText').value.trim(),id:String(Date.now())},updatedAt:Date.now()},{merge:true});
-  log('إرسال رسالة Inbox');flash($('#inboxSave'));
+  await adminWrite(()=>db.collection('config').doc('settings').set({inbox:{active:$('#cfgInboxEn').checked,text:$('#cfgInboxText').value.trim(),id:String(Date.now())},updatedAt:Date.now()},{merge:true}),'إرسال رسالة Inbox',$('#inboxSave'));
 };
 const normKey=(a,b)=>(a+'|'+b).toLowerCase().replace(/\s+/g,'');
 $('#pinSet').onclick=async()=>{
   const h=$('#pinHome').value.trim(),a=$('#pinAway').value.trim();
   if(!h||!a){alert('اكتب اسم الفريقين');return;}
-  await db.collection('config').doc('settings').set({pinnedKey:normKey(h,a),updatedAt:Date.now()},{merge:true});
-  log('تثبيت مباراة اليوم: '+h+' × '+a);flash($('#pinSet'));
+  await adminWrite(()=>db.collection('config').doc('settings').set({pinnedKey:normKey(h,a),updatedAt:Date.now()},{merge:true}),'تثبيت مباراة اليوم: '+h+' × '+a,$('#pinSet'));
 };
-$('#pinClear').onclick=async()=>{await db.collection('config').doc('settings').set({pinnedKey:'',updatedAt:Date.now()},{merge:true});log('إلغاء تثبيت المباراة');};
+$('#pinClear').onclick=async()=>{await adminWrite(()=>db.collection('config').doc('settings').set({pinnedKey:'',updatedAt:Date.now()},{merge:true}),'إلغاء تثبيت المباراة',$('#pinClear'));};
 $('#hideSave').onclick=async()=>{
   const hm=$('#hidMatches').value.split(',').map(s=>s.trim().toLowerCase().replace(/\s+/g,'')).filter(Boolean);
   const hl=$('#hidLeagues').value.split(',').map(s=>s.trim()).filter(Boolean);
-  await db.collection('config').doc('settings').set({hiddenMatches:hm,hiddenLeagues:hl,updatedAt:Date.now()},{merge:true});
-  log('تحديث قوائم الإخفاء');flash($('#hideSave'));
+  await adminWrite(()=>db.collection('config').doc('settings').set({hiddenMatches:hm,hiddenLeagues:hl,updatedAt:Date.now()},{merge:true}),'تحديث قوائم الإخفاء',$('#hideSave'));
 };
 $('#guideSave').onclick=async()=>{
-  await db.collection('config').doc('settings').set({guide:{title:$('#gTitle').value.trim(),s1:$('#gS1').value.trim(),s2:$('#gS2').value.trim(),s3:$('#gS3').value.trim(),warn:$('#gWarn').value.trim(),btn:$('#gBtn').value.trim()},updatedAt:Date.now()},{merge:true});
-  log('تعديل نصوص الإرشادات');flash($('#guideSave'));
+  await adminWrite(()=>db.collection('config').doc('settings').set({guide:{title:$('#gTitle').value.trim(),s1:$('#gS1').value.trim(),s2:$('#gS2').value.trim(),s3:$('#gS3').value.trim(),warn:$('#gWarn').value.trim(),btn:$('#gBtn').value.trim()},updatedAt:Date.now()},{merge:true}),'تعديل نصوص الإرشادات',$('#guideSave'));
 };
 $('#tgSave').onclick=async()=>{
-  await db.collection('private').doc('telegram').set({token:$('#tgToken').value.trim(),chatId:$('#tgChat').value.trim(),channelLink:'https://t.me/Ech0_k'},{merge:true});
-  tgCache=null;log('تحديث إعدادات تليجرام');flash($('#tgSave'));
+  const ok=await adminWrite(()=>db.collection('private').doc('telegram').set({token:$('#tgToken').value.trim(),chatId:$('#tgChat').value.trim(),channelLink:'https://t.me/Ech0_k'},{merge:true}),'تحديث إعدادات تليجرام',$('#tgSave'));if(ok)tgCache=null;
 };
 $('#tgTest').onclick=async()=>{const ok=await tgSend('✅ رسالة اختبار من لوحة 𝙍𝘼𝟯𝘿 𝘽𝙀𝙏');alert(ok?'وصلت؟ ✅':'فشل ❌');};
 $('#tgReport').onclick=sendReport;
