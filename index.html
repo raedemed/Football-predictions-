@@ -84,6 +84,21 @@ button,input,select,textarea{font:inherit;color:inherit}.hidden{display:none!imp
 .splash.fade{opacity:0;pointer-events:none}.splash-box{display:grid;justify-items:center;gap:12px;text-align:center}
 .splash-box svg{width:96px;height:96px;animation:pulse 1.4s infinite}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+.maintenance{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 18% 12%,rgba(56,189,248,.18),transparent 34%),radial-gradient(circle at 82% 20%,rgba(34,197,94,.16),transparent 30%),linear-gradient(145deg,#050810 0%,#0b1426 52%,#050810 100%);overflow:hidden}
+.maintenance:before{content:"";position:absolute;width:420px;height:420px;border-radius:50%;border:1px solid rgba(56,189,248,.12);box-shadow:0 0 0 34px rgba(56,189,248,.035),0 0 0 68px rgba(56,189,248,.025);animation:maintOrbit 9s linear infinite}
+.maintenance-card{position:relative;width:min(510px,100%);padding:34px 26px 28px;text-align:center;border:1px solid rgba(255,255,255,.14);border-radius:30px;background:linear-gradient(180deg,rgba(17,30,52,.88),rgba(6,12,23,.92));box-shadow:0 24px 80px rgba(0,0,0,.48),inset 0 1px rgba(255,255,255,.08);backdrop-filter:blur(18px)}
+.maintenance-icon{width:82px;height:82px;margin:0 auto 18px;display:grid;place-items:center;border-radius:26px;background:linear-gradient(135deg,rgba(56,189,248,.22),rgba(34,197,94,.2));border:1px solid rgba(125,211,252,.38);font-size:42px;box-shadow:0 12px 35px rgba(56,189,248,.18);animation:maintFloat 2.8s ease-in-out infinite}
+.maintenance-card h1{font-size:clamp(24px,6vw,34px);font-weight:900;letter-spacing:.2px;margin-bottom:10px;background:linear-gradient(90deg,#e0f2fe,#86efac,#fef3c7);-webkit-background-clip:text;background-clip:text;color:transparent}
+.maintenance-card p{color:#b7c5df;line-height:2;font-size:14px;margin:0 auto;max-width:390px}
+.maintenance-status{display:inline-flex;align-items:center;gap:8px;margin-top:20px;padding:8px 14px;border-radius:99px;color:#bbf7d0;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.28);font-size:11px;font-weight:800}
+.maintenance-status i{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 5px rgba(34,197,94,.12);animation:pulse 1.5s infinite}
+.maintenance-credit{margin-top:22px;color:#7183a5;font-size:11px}.maintenance-credit b{color:#fcd34d;font-weight:900}
+.developer-credit{position:fixed;right:14px;bottom:14px;z-index:55;display:inline-flex;align-items:center;gap:7px;padding:8px 13px;border:1px solid rgba(251,191,36,.32);border-radius:999px;background:linear-gradient(135deg,rgba(12,21,38,.92),rgba(5,8,16,.92));box-shadow:0 8px 24px rgba(0,0,0,.28),0 0 0 1px rgba(255,255,255,.03);color:#9aa8c7;font-size:10.5px;font-weight:700;backdrop-filter:blur(12px)}
+.developer-credit:before{content:"✦";color:#fbbf24;font-size:13px}.developer-credit b{color:#fde68a;font-weight:900;letter-spacing:.4px}
+@keyframes maintFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-7px) rotate(2deg)}}
+@keyframes maintOrbit{to{transform:rotate(360deg)}}
+@media(max-width:480px){.maintenance{padding:16px}.maintenance-card{padding:28px 18px 23px;border-radius:24px}.developer-credit{right:10px;bottom:10px;font-size:9.5px;padding:7px 10px}}
+
 .splash-box h1{font-size:27px;font-weight:800}.splash-box h1 span{color:#fbbf24}.splash-box p{color:var(--muted);font-size:13px}
 .splash-bar{width:190px;height:6px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:8px}
 .splash-bar span{display:block;height:100%;width:40%;border-radius:99px;background:linear-gradient(90deg,var(--accent2),var(--accent));animation:load 1.4s infinite}
@@ -178,7 +193,7 @@ setTimeout(function(){
   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
   <span class="tg-txt"><span class="tg-main" id="tgFabMain">انضم لقناة 𝙍𝘼𝟯𝘿 𝘽𝙀𝙏 🔔</span><span class="tg-sub" id="tgFabSub"><span class="dot-live"></span><span id="tgFabCount">+2.4K</span></span></span>
 </a>
-<div id="maintenanceScreen" class="maintenance hidden"><div><h1>🔧 وضع الصيانة</h1><p id="maintenanceMsg">نعمل على تحديثات، هنرجع قريباً.</p><p style="margin-top:20px;color:#fbbf24">— فريق 𝙍𝘼𝟯𝘿 𝘽𝙀𝙏</p></div></div>
+<div id="maintenanceScreen" class="maintenance hidden" role="status" aria-live="polite"><div class="maintenance-card"><div class="maintenance-icon" aria-hidden="true">🛠️</div><h1>نرجع لكم قريبًا</h1><p id="maintenanceMsg">الموقع تحت الصيانة حاليًا لتحسين التجربة وتقديم أفضل خدمة.</p><div class="maintenance-status"><i></i><span>نعمل على التحديث الآن</span></div><div class="maintenance-credit">تصميم وتطوير <b>RA3D BET</b></div></div></div>
 <div id="guideModal" class="gmodal hidden"><div class="gcard">
 <svg viewBox="0 0 64 64"><defs><linearGradient id="lgG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fde68a"/><stop offset="1" stop-color="#f59e0b"/></linearGradient></defs><path d="M8 19Q32 7 56 19" fill="none" stroke="url(#lgG)" stroke-width="4.5" stroke-linecap="round"/><path d="M10 31Q32 13 54 31Q32 49 10 31Z" fill="none" stroke="url(#lgG)" stroke-width="4.5" stroke-linejoin="round"/><circle cx="32" cy="31" r="8.5" fill="url(#lgG)"/><path d="M32 24.5l2.6 3.4-1 4h-3.2l-1-4Z" fill="#050810"/><path d="M24 45v9" stroke="url(#lgG)" stroke-width="4.5" stroke-linecap="round"/><path d="M42 45q3 8-6 10" fill="none" stroke="url(#lgG)" stroke-width="4.5" stroke-linecap="round"/></svg>
 <h2>إزاي تاخد <span>التوقع الصح</span>؟</h2>
@@ -1195,6 +1210,6 @@ function timeOnly(iso){var d=new Date(iso);return isNaN(d)?'':new Intl.DateTimeF
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(s){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s];});}
 if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('./sw.js').then(function(r){r.update();}).catch(function(){});});}
 </script>
-<div class="developer-credit" aria-label="المطور">المطور R3</div>
+<div class="developer-credit" aria-label="المطور">تصميم وتطوير: <b>RA3D BET</b></div>
 </body>
 </html>
