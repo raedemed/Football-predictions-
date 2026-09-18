@@ -93,11 +93,11 @@ button,input,select,textarea{font:inherit;color:inherit}.hidden{display:none!imp
 .maintenance-status{display:inline-flex;align-items:center;gap:8px;margin-top:20px;padding:8px 14px;border-radius:99px;color:#bbf7d0;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.28);font-size:11px;font-weight:800}
 .maintenance-status i{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 5px rgba(34,197,94,.12);animation:pulse 1.5s infinite}
 .maintenance-credit{margin-top:22px;color:#7183a5;font-size:11px}.maintenance-credit b{color:#fcd34d;font-weight:900}
-.developer-credit{position:fixed;right:14px;bottom:14px;z-index:55;display:inline-flex;align-items:center;gap:7px;padding:8px 13px;border:1px solid rgba(251,191,36,.32);border-radius:999px;background:linear-gradient(135deg,rgba(12,21,38,.92),rgba(5,8,16,.92));box-shadow:0 8px 24px rgba(0,0,0,.28),0 0 0 1px rgba(255,255,255,.03);color:#9aa8c7;font-size:10.5px;font-weight:700;backdrop-filter:blur(12px)}
+.developer-credit{position:relative;right:auto;bottom:auto;z-index:1;display:flex;width:max-content;margin:18px auto 86px;align-items:center;gap:7px;padding:8px 13px;border:1px solid rgba(251,191,36,.32);border-radius:999px;background:linear-gradient(135deg,rgba(12,21,38,.92),rgba(5,8,16,.92));box-shadow:0 8px 24px rgba(0,0,0,.28),0 0 0 1px rgba(255,255,255,.03);color:#9aa8c7;font-size:10.5px;font-weight:700;backdrop-filter:blur(12px)}
 .developer-credit:before{content:"✦";color:#fbbf24;font-size:13px}.developer-credit b{color:#fde68a;font-weight:900;letter-spacing:.4px}
 @keyframes maintFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-7px) rotate(2deg)}}
 @keyframes maintOrbit{to{transform:rotate(360deg)}}
-@media(max-width:480px){.maintenance{padding:16px}.maintenance-card{padding:28px 18px 23px;border-radius:24px}.developer-credit{right:10px;bottom:10px;font-size:9.5px;padding:7px 10px}}
+@media(max-width:480px){.maintenance{padding:16px}.maintenance-card{padding:28px 18px 23px;border-radius:24px}.developer-credit{right:auto;bottom:auto;margin:16px auto 82px;font-size:9.5px;padding:7px 10px}}
 
 .splash-box h1{font-size:27px;font-weight:800}.splash-box h1 span{color:#fbbf24}.splash-box p{color:var(--muted);font-size:13px}
 .splash-bar{width:190px;height:6px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:8px}
