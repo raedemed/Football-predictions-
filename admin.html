@@ -120,6 +120,7 @@ body{font-family:'Cairo',sans-serif;background:#050810;color:#edf2ff;min-height:
   </div>
 
   <div id="healthBar" class="health ok">✅ المصادر سليمة</div>
+  <div id="adminOpStatus" class="msg" aria-live="polite"></div>
 
   <div class="section"><h3>📈 آخر 7 أيام (زيارات + مشاهدات رهانات)</h3><div class="chart-wrap"><canvas id="chartWeek"></canvas></div></div>
 
@@ -237,6 +238,8 @@ const FIREBASE_CONFIG={"apiKey": "AIzaSyCI0TxS5tWwRPSSeonyXBFqM1PR0AQH7s0", "aut
 firebase.initializeApp(FIREBASE_CONFIG);
 const auth=firebase.auth(), db=firebase.firestore();
 const $=s=>document.querySelector(s);
+function opStatus(text,kind){var el=$('#adminOpStatus');if(!el)return;el.textContent=text;el.className='msg '+(kind||'ok');clearTimeout(window.__opTimer);window.__opTimer=setTimeout(function(){el.className='msg';},5000);}
+window.addEventListener('unhandledrejection',function(e){console.error('[RA3D admin] unhandled promise',e.reason);opStatus('❌ فشل التنفيذ: '+((e.reason&&(e.reason.code||e.reason.message))||'تحقق من صلاحيات Firebase والاتصال'),'err');});
 let allSugg=[], chartInst=null, tgCache=null, chatUnsub=null, pollTimer=null, tgSentSugg=new Set(JSON.parse(sessionStorage.getItem('eb_tg_sugg')||'[]')), tgSentAlerts=new Set(JSON.parse(sessionStorage.getItem('eb_tg_alert')||'[]'));
 
 auth.onAuthStateChanged(user=>{
@@ -541,7 +544,7 @@ async function loadExt(){
   const keys=Object.keys(ex);
   if(keys.length)keys.forEach(k=>extRow(k,ex[k]));else extRow('','');
 }
-function flash(btn){btn.textContent='✓ تم الحفظ';btn.classList.add('saved');setTimeout(()=>{btn.textContent=btn.dataset.orig||'حفظ';btn.classList.remove('saved');},1600);}
+function flash(btn){btn.textContent='✓ تم الحفظ';btn.classList.add('saved');opStatus('✅ تم تنفيذ التغيير بنجاح','ok');setTimeout(()=>{btn.textContent=btn.dataset.orig||'حفظ';btn.classList.remove('saved');},1600);}
 document.querySelectorAll('.save-btn').forEach(b=>b.dataset.orig=b.textContent);
 function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 /* ===== إدارة الأعضاء ===== */
@@ -615,7 +618,7 @@ document.getElementById('addUserBtn').onclick=addUser;
 /* ===== clear members chat ===== */
 function chatTime(x){var d=x&&x.toDate?x.toDate():new Date(x||Date.now());return isNaN(d)?'الآن':d.toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'});}
 function renderAdminChat(snap){var box=document.getElementById('adminChatList');if(!box)return;var rows=[];snap.forEach(function(doc){var x=doc.data()||{};rows.push('<div class="chat-admin-msg '+((x.u||'').indexOf('Admin')===0?'admin':'user')+'"><div class="chat-admin-meta">'+escapeHtml(x.u||'زائر')+' · '+chatTime(x.ts||x.tm)+'</div><div>'+escapeHtml(x.t||'')+'</div></div>');});box.innerHTML=rows.join('')||'<div style="color:#9aa8c7;font-size:12px">لا توجد رسائل بعد.</div>';box.scrollTop=box.scrollHeight;}
-function startAdminChat(){if(chatUnsub)return;chatUnsub=db.collection('chat_messages').orderBy('ts','asc').limitToLast(100).onSnapshot(renderAdminChat,function(e){console.error('chat listener',e);showMsg('chatMsg','تعذر قراءة الشات: '+(e.code||e.message),'err');});}
+function startAdminChat(){if(chatUnsub)return;var q=db.collection('chat_messages').orderBy('ts','asc').limitToLast(100);chatUnsub=q.onSnapshot(renderAdminChat,function(e){console.error('chat listener',e);showMsg('chatMsg','تعذر الاستعلام المرتب، جاري عرض آخر الرسائل...','err');if(chatUnsub){chatUnsub();chatUnsub=null;}chatUnsub=db.collection('chat_messages').limitToLast(100).onSnapshot(renderAdminChat,function(e2){showMsg('chatMsg','تعذر قراءة الشات: '+(e2.code||e2.message),'err');});});}
 async function sendAdminChat(){var input=document.getElementById('adminChatInput'),t=(input.value||'').trim();if(!t)return;var btn=document.getElementById('adminChatSend');btn.disabled=true;try{await db.collection('chat_messages').add({u:'Admin · '+(auth.currentUser&&auth.currentUser.email||'RA3D BET'),t:t,tm:Date.now(),ts:firebase.firestore.FieldValue.serverTimestamp()});input.value='';showMsg('chatMsg','تم إرسال الرد ✔','ok');}catch(e){showMsg('chatMsg','فشل إرسال الرد: '+(e.code||e.message),'err');}finally{btn.disabled=false;}}
 async function clearChat(){
   if(!confirm('\u0645\u062A\u0623\u0643\u062F \u0625\u0646\u0643 \u0639\u0627\u064A\u0632 \u062A\u0645\u0633\u062D \u0643\u0644 \u0631\u0633\u0627\u0626\u0644 \u0634\u0627\u062A \u0627\u0644\u0623\u0639\u0636\u0627\u0621\u061F\n\u0645\u0641\u064A\u0634 \u0631\u062C\u0639\u0629 \u0641\u064A\u0647\u0627!'))return;
