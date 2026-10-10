@@ -77,6 +77,7 @@ body{font-family:'Cairo',sans-serif;background:#050810;color:#edf2ff;min-height:
 .msg{margin-top:8px;padding:8px 12px;border-radius:8px;font-size:13px;display:none;}
 .msg.ok{display:block;background:#065f46;color:#d1fae5;}
 .msg.err{display:block;background:#7f1d1d;color:#fee2e2;}
+.chat-admin-list{max-height:420px;overflow:auto;display:flex;flex-direction:column;gap:8px;margin:10px 0}.chat-admin-msg{padding:9px 11px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);font-size:12px;line-height:1.7}.chat-admin-msg.admin{border-right:3px solid #22c55e}.chat-admin-msg.user{border-right:3px solid #38bdf8}.chat-admin-meta{font-size:10px;color:#9aa8c7;margin-bottom:3px}.chat-admin-compose{display:flex;gap:8px}.chat-admin-compose input{flex:1;padding:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);border-radius:10px;color:#fff;outline:none;font-family:inherit}
 </style>
 </head>
 <body>
@@ -236,14 +237,14 @@ const FIREBASE_CONFIG={"apiKey": "AIzaSyCI0TxS5tWwRPSSeonyXBFqM1PR0AQH7s0", "aut
 firebase.initializeApp(FIREBASE_CONFIG);
 const auth=firebase.auth(), db=firebase.firestore();
 const $=s=>document.querySelector(s);
-let allSugg=[], chartInst=null, tgCache=null, tgSentSugg=new Set(JSON.parse(sessionStorage.getItem('eb_tg_sugg')||'[]')), tgSentAlerts=new Set(JSON.parse(sessionStorage.getItem('eb_tg_alert')||'[]'));
+let allSugg=[], chartInst=null, tgCache=null, chatUnsub=null, pollTimer=null, tgSentSugg=new Set(JSON.parse(sessionStorage.getItem('eb_tg_sugg')||'[]')), tgSentAlerts=new Set(JSON.parse(sessionStorage.getItem('eb_tg_alert')||'[]'));
 
 auth.onAuthStateChanged(user=>{
   if(user){
     if(user.email!=='novaa118n@gmail.com'){auth.signOut();$('#loginErr').textContent='مش مصرح لك.';return;}
     $('#loginScreen').classList.add('hidden');$('#adminApp').classList.remove('hidden');
     $('#adminEmail').textContent=user.email;
-    loadAll(); setInterval(poll,30000);
+    loadAll(); if(!pollTimer)pollTimer=setInterval(poll,30000); startAdminChat();
   }
 });
 $('#loginBtn').onclick=async()=>{
@@ -278,13 +279,12 @@ async function tgSend(text){
 }
 
 /* ===== LOADERS ===== */
+async function runSafe(name,fn){try{await fn();}catch(e){console.error('[RA3D admin] '+name,e);const h=$('#healthBar');if(h){h.className='health down';h.textContent='⚠️ تعذر تحديث '+name+' — '+(e.code||e.message||'خطأ غير معروف');}}}
 async function loadAll(){
-  await Promise.all([loadCards(),loadChart(),loadLeaders(),loadGeo(),loadConfig(),loadSuggestions(),loadAlerts(),loadLog(),loadExt(),loadUsers()]);
+  await Promise.all([runSafe('الإحصائيات',loadCards),runSafe('الرسم البياني',loadChart),runSafe('الأكثر مشاهدة',loadLeaders),runSafe('الجغرافيا',loadGeo),runSafe('الإعدادات',loadConfig),runSafe('الاقتراحات',loadSuggestions),runSafe('التنبيهات',loadAlerts),runSafe('السجل',loadLog),runSafe('الروابط',loadExt),runSafe('الأعضاء',loadUsers)]);
 }
 async function poll(){
-  await Promise.all([loadCards(),loadSuggestions(),loadAlerts(),loadUsers()]);
-  tgChecks();
-  autoReport();
+  await Promise.all([runSafe('الإحصائيات',loadCards),runSafe('الاقتراحات',loadSuggestions),runSafe('التنبيهات',loadAlerts),runSafe('الأعضاء',loadUsers)]); tgChecks(); autoReport();
 }
 async function loadCards(){
   const today=new Date().toISOString().slice(0,10);
@@ -613,6 +613,10 @@ function escapeHtml(s){return String(s).replace(/[&<>"']/g,function(c){return {'
 document.getElementById('addUserBtn').onclick=addUser;
 /* =====    ===== */
 /* ===== clear members chat ===== */
+function chatTime(x){var d=x&&x.toDate?x.toDate():new Date(x||Date.now());return isNaN(d)?'الآن':d.toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'});}
+function renderAdminChat(snap){var box=document.getElementById('adminChatList');if(!box)return;var rows=[];snap.forEach(function(doc){var x=doc.data()||{};rows.push('<div class="chat-admin-msg '+((x.u||'').indexOf('Admin')===0?'admin':'user')+'"><div class="chat-admin-meta">'+escapeHtml(x.u||'زائر')+' · '+chatTime(x.ts||x.tm)+'</div><div>'+escapeHtml(x.t||'')+'</div></div>');});box.innerHTML=rows.join('')||'<div style="color:#9aa8c7;font-size:12px">لا توجد رسائل بعد.</div>';box.scrollTop=box.scrollHeight;}
+function startAdminChat(){if(chatUnsub)return;chatUnsub=db.collection('chat_messages').orderBy('ts','asc').limitToLast(100).onSnapshot(renderAdminChat,function(e){console.error('chat listener',e);showMsg('chatMsg','تعذر قراءة الشات: '+(e.code||e.message),'err');});}
+async function sendAdminChat(){var input=document.getElementById('adminChatInput'),t=(input.value||'').trim();if(!t)return;var btn=document.getElementById('adminChatSend');btn.disabled=true;try{await db.collection('chat_messages').add({u:'Admin · '+(auth.currentUser&&auth.currentUser.email||'RA3D BET'),t:t,tm:Date.now(),ts:firebase.firestore.FieldValue.serverTimestamp()});input.value='';showMsg('chatMsg','تم إرسال الرد ✔','ok');}catch(e){showMsg('chatMsg','فشل إرسال الرد: '+(e.code||e.message),'err');}finally{btn.disabled=false;}}
 async function clearChat(){
   if(!confirm('\u0645\u062A\u0623\u0643\u062F \u0625\u0646\u0643 \u0639\u0627\u064A\u0632 \u062A\u0645\u0633\u062D \u0643\u0644 \u0631\u0633\u0627\u0626\u0644 \u0634\u0627\u062A \u0627\u0644\u0623\u0639\u0636\u0627\u0621\u061F\n\u0645\u0641\u064A\u0634 \u0631\u062C\u0639\u0629 \u0641\u064A\u0647\u0627!'))return;
   try{
@@ -633,14 +637,16 @@ async function clearChat(){
 }
 (function(){
   var sec=document.createElement('div');sec.className='section';
-  sec.innerHTML='<h3>\uD83E\uDDF9 \u0645\u0633\u062D \u0634\u0627\u062A \u0627\u0644\u0623\u0639\u0636\u0627\u0621</h3>'
-   +'<p style="color:var(--muted);font-size:12px;margin-bottom:10px;">\u0628\u064A\u0645\u0633\u062D \u0643\u0644 \u0631\u0633\u0627\u0626\u0644 \u0627\u0644\u0634\u0627\u062A \u0646\u0647\u0627\u0626\u064A\u0627\u064B \u0645\u0646 \u0643\u0644 \u0627\u0644\u0623\u0639\u0636\u0627\u0621 \u0641\u064A \u0646\u0641\u0633 \u0627\u0644\u0644\u062D\u0638\u0629.</p>'
-   +'<button id="clearChatBtn" style="background:#dc2626;color:#fff;border:0;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer;">\uD83D\uDDD1 \u0645\u0633\u062D \u0627\u0644\u0634\u0627\u062A \u0643\u0644\u0647</button>'
+  sec.innerHTML='<h3>💬 شات الأعضاء</h3>'
+   +'<p style="color:var(--muted);font-size:12px;margin-bottom:10px;">الرسائل تظهر هنا لحظيًا. اكتب ردك وسيصل للمستخدمين فورًا.</p>'
+   +'<div id="adminChatList" class="chat-admin-list"></div>'
+   +'<div class="chat-admin-compose"><input id="adminChatInput" placeholder="اكتب رد الأدمن..."><button id="adminChatSend" class="btn-s green">إرسال</button></div>'
+   +'<div style="margin-top:12px"><button id="clearChatBtn" class="btn-s red">🗑 مسح الشات كله</button></div>'
    +'<div id="chatMsg" class="msg"></div>';
   var host=document.getElementById('addUserBtn');
   var sect=host&&host.closest?host.closest('.section'):null;
   if(sect&&sect.parentNode){sect.parentNode.insertBefore(sec,sect.nextSibling);}else{document.body.appendChild(sec);}
-  document.addEventListener('click',function(e){if(e.target&&e.target.id==='clearChatBtn')clearChat();});
+  document.addEventListener('click',function(e){if(e.target&&e.target.id==='clearChatBtn')clearChat();if(e.target&&e.target.id==='adminChatSend')sendAdminChat();});document.addEventListener('keydown',function(e){if(e.target&&e.target.id==='adminChatInput'&&e.key==='Enter')sendAdminChat();});
 })();
 </script>
 <script>

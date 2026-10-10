@@ -2334,7 +2334,7 @@ try{
     panel.innerHTML='<div class="egb-chat-card">'
       +'<div class="egb-chat-head"><span>💬 شات الأعضاء</span><button id="egbChatX" style="border:0;background:transparent;color:#94a3b8;font-size:16px;cursor:pointer">✖</button></div>'
       +'<div class="egb-chat-msgs" id="egbChatMsgs"></div>'
-      +'<div class="egb-chat-foot"><input id="egbChatIn" placeholder="اكتب رسالة…"><button id="egbChatSend">إرسال</button></div>'
+      +'<div id="egbChatErr" style="color:#fca5a5;font-size:11px;min-height:16px"></div><div class="egb-chat-foot"><input id="egbChatIn" placeholder="اكتب رسالة…"><button id="egbChatSend">إرسال</button></div>'
       +'</div>';
     document.body.appendChild(panel);
     document.getElementById('egbChatX').onclick=closeChat;
@@ -2360,7 +2360,7 @@ try{
     var t=(inp.value||'').trim();if(!t)return;
     inp.value='';
     var d=db();if(!d)return;
-    d.collection('chat_messages').add({u:me(),t:t,tm:now(),ts:firebase.firestore.FieldValue.serverTimestamp()}).catch(function(){});
+    d.collection('chat_messages').add({u:me(),t:t,tm:now(),ts:firebase.firestore.FieldValue.serverTimestamp()}).catch(function(e){console.warn('[RA3D chat] send failed',e);var err=document.getElementById('egbChatErr');if(err)err.textContent='تعذر الإرسال: '+(e.code||'تحقق من الاتصال');});
   }
   function closeChat(){if(unsub){try{unsub();}catch(e){}unsub=null;}if(panel){panel.remove();panel=null;}}
   function fab(){
