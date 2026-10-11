@@ -237,6 +237,8 @@ body{font-family:'Cairo',sans-serif;background:#050810;color:#edf2ff;min-height:
 const FIREBASE_CONFIG={"apiKey": "AIzaSyCI0TxS5tWwRPSSeonyXBFqM1PR0AQH7s0", "authDomain": "ra3d-bet.firebaseapp.com", "projectId": "ra3d-bet", "storageBucket": "ra3d-bet.firebasestorage.app", "messagingSenderId": "1047274909652", "appId": "1:1047274909652:web:1cfae0af1f6dd86a65f041"};
 firebase.initializeApp(FIREBASE_CONFIG);
 const auth=firebase.auth(), db=firebase.firestore();
+const ADMIN_EMAILS=['raedemad118@gmail.com','novaa118n@gmail.com','novaa118@gmail.com','admin@r3raebet.app'];
+function isAllowedAdmin(user){return !!(user&&user.email&&ADMIN_EMAILS.indexOf(String(user.email).toLowerCase())>=0);}
 const $=s=>document.querySelector(s);
 function opStatus(text,kind){var el=$('#adminOpStatus');if(!el)return;el.textContent=text;el.className='msg '+(kind||'ok');clearTimeout(window.__opTimer);window.__opTimer=setTimeout(function(){el.className='msg';},5000);}
 window.addEventListener('unhandledrejection',function(e){console.error('[RA3D admin] unhandled promise',e.reason);opStatus('❌ فشل التنفيذ: '+((e.reason&&(e.reason.code||e.reason.message))||'تحقق من صلاحيات Firebase والاتصال'),'err');});
@@ -244,7 +246,7 @@ let allSugg=[], chartInst=null, tgCache=null, chatUnsub=null, pollTimer=null, tg
 
 auth.onAuthStateChanged(user=>{
   if(user){
-    if(user.email!=='novaa118n@gmail.com'){auth.signOut();$('#loginErr').textContent='مش مصرح لك.';return;}
+    if(!isAllowedAdmin(user)){auth.signOut();$('#loginErr').textContent='هذا الحساب غير مصرح له بلوحة الأدمن.';return;}
     $('#loginScreen').classList.add('hidden');$('#adminApp').classList.remove('hidden');
     $('#adminEmail').textContent=user.email;
     loadAll(); if(!pollTimer)pollTimer=setInterval(poll,30000); startAdminChat();
@@ -292,35 +294,35 @@ async function poll(){
 async function loadCards(){
   const today=new Date().toISOString().slice(0,10);
   const [v,b,d,dl,dd,online]=await Promise.all([
-    db.collection('counters').doc('visits').get(),
-    db.collection('counters').doc('betViews').get(),
-    db.collection('counters').doc('downloads').get(),
-    db.collection('daily').doc(today).get(),
-    db.collection('counters').doc('sourcesHealth').get(),
-    db.collection('presence').where('lastSeen','>=',Date.now()-70000).get()
+    db.collection('counters').doc('visits').get().catch(()=>null),
+    db.collection('counters').doc('betViews').get().catch(()=>null),
+    db.collection('counters').doc('downloads').get().catch(()=>null),
+    db.collection('daily').doc(today).get().catch(()=>null),
+    db.collection('counters').doc('sourcesHealth').get().catch(()=>null),
+    db.collection('presence').where('lastSeen','>=',Date.now()-70000).get().catch(()=>({size:0}))
   ]);
   $('#cVisits').textContent=(v.data()&&v.data().total)||0;
   $('#cBets').textContent=(b.data()&&b.data().total)||0;
   $('#cDl').textContent=(d.data()&&d.data().total)||0;
   $('#cNew').textContent=(dd.data()&&dd.data().newUsers)||0;
   $('#cRet').textContent=(dd.data()&&dd.data().returning)||0;
-  $('#cOnline').textContent=online.size;
+  $('#cOnline').textContent=online&&typeof online.size==='number'?online.size:0;
   const hb=$('#healthBar');
-  if(dd.exists&&dd.data()){
+  if(dd&&dd.exists&&dd.data()){
     const rates=allSugg.filter(s=>s.rating>0);
     $('#cRate').textContent=rates.length?(rates.reduce((s,x)=>s+x.rating,0)/rates.length).toFixed(1)+' ★':'-';
   }
-  if(dh=dl.data()){
+  if(dl&& (dh=dl.data())){
     if(dh.status==='ok'){hb.className='health ok';hb.innerHTML=`✅ المصادر سليمة — آخر فحص: ${new Date(dh.ts).toLocaleTimeString('ar-EG')} (${(dh.ok||[]).join(' + ')||'-'})`;}
     else{hb.className='health down';hb.innerHTML=`🚨 المصادر واقعـة! آخر فحص: ${new Date(dh.ts).toLocaleTimeString('ar-EG')}`;}
   }
 }
 async function loadChart(){
   const days=[];for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10));}
-  const docs=await Promise.all(days.map(d=>db.collection('daily').doc(d).get()));
+  const docs=await Promise.all(days.map(d=>db.collection('daily').doc(d).get().catch(()=>null)));
   const labels=days.map(d=>new Date(d).toLocaleDateString('ar-EG',{weekday:'short',day:'numeric'}));
-  const vis=docs.map(x=>(x.data()&&x.data().visits)||0);
-  const bets=docs.map(x=>(x.data()&&x.data().betViews)||0);
+  const vis=docs.map(x=>(x&&x.data()&&x.data().visits)||0);
+  const bets=docs.map(x=>(x&&x.data()&&x.data().betViews)||0);
   const ctx=$('#chartWeek').getContext('2d');
   if(chartInst)chartInst.destroy();
   chartInst=new Chart(ctx,{type:'line',data:{labels,datasets:[
@@ -406,16 +408,14 @@ async function loadLog(){
 function tgChecks(){
   if($('#tgAutoSugg').checked){
     allSugg.filter(s=>!s.read&&s.status==='pending'&&!tgSentSugg.has(s.id)).forEach(s=>{
-      tgSend(`📬 <b>اقتراح جديد</b>\n👤 ${s.name||'مجهول'} ${s.rating?'('+s.rating+'★)':''}\n💬 ${s.message}`);
-      tgSentSugg.add(s.id); sessionStorage.setItem('eb_tg_sugg',JSON.stringify([...tgSentSugg]));
+      tgSend(`📬 <b>اقتراح جديد</b>\n👤 ${s.name||'مجهول'} ${s.rating?'('+s.rating+'★)':''}\n💬 ${s.message}`).then(function(ok){if(ok){tgSentSugg.add(s.id);sessionStorage.setItem('eb_tg_sugg',JSON.stringify([...tgSentSugg]));}});
     });
   }
   if($('#tgAutoAlert').checked){
     db.collection('alerts').orderBy('ts','desc').limit(3).get().then(snap=>{
       snap.forEach(d=>{const x=d.data();
         if(!tgSentAlerts.has(d.id)&&Date.now()-x.ts<120000){
-          tgSend(`🚨 <b>تنبيه عطل</b>\n${x.msg||x.type}`);
-          tgSentAlerts.add(d.id); sessionStorage.setItem('eb_tg_alert',JSON.stringify([...tgSentAlerts]));
+          tgSend(`🚨 <b>تنبيه عطل</b>\n${x.msg||x.type}`).then(function(ok){if(ok){tgSentAlerts.add(d.id);sessionStorage.setItem('eb_tg_alert',JSON.stringify([...tgSentAlerts]));}});
         }});
     });
   }
@@ -511,7 +511,7 @@ document.querySelectorAll('.save-btn').forEach(b=>b.dataset.orig=b.textContent);
 function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 /* ===== إدارة الأعضاء ===== */
 var usersCache=[];
-function tgNotify(t){return false;}
+async function tgNotify(t){return tgSend(t);}
 function hashPwd(u,p){var s=u+':'+p;var h=0x811c9dc5;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=(h*0x01000193)>>>0;}return ('0000000'+h.toString(16)).slice(-8);}
 async function loadUsers(){
   try{
@@ -529,7 +529,7 @@ function renderUsers(){
   for(var i=0;i<usersCache.length;i++){
     var u=usersCache[i];
     var dt=u.createdAt?new Date(u.createdAt).toLocaleDateString('ar-EG'):'غير محدد';
-    var isSelf=(u.u==='Adminbebohamo');
+    var isSelf=false;
     html+='<div class="user-row">'
       +'<div><div class="uname">'+escapeHtml(u.u||'?')+'</div><div class="udate">أُضيف: '+dt+'</div></div>'
       +'<button class="udel" data-id="'+u.id+'" '+(isSelf?'disabled':'')+'>🗑 مسح</button>'

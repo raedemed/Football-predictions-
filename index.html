@@ -323,7 +323,16 @@ var lastRefreshSignal=lsGet('eb_refresh_sig')||0;
 function checkRefreshSignal(){var sig=remoteCfg.refreshSignal||0;if(sig&&sig!==lastRefreshSignal){lastRefreshSignal=sig;lsSet('eb_refresh_sig',sig);forceFullRefresh();}}
 function forceFullRefresh(){try{localStorage.removeItem('eb_cache');for(var i=0;i<8;i++){localStorage.removeItem(finDayKey(fmtDate(addDays(new Date(),-i))));}}catch(e){}try{livePoolMap.clear();}catch(e){}loadMatches(true);try{renderCurrent();}catch(e){}}
 function showInbox(f){try{if(!(remoteCfg.inbox&&remoteCfg.inbox.active&&(remoteCfg.inbox.text||'').trim()))return;var m=document.getElementById('inboxModal');if(!m.classList.contains('hidden'))return;var n=Date.now();if(!f&&n-lastInboxShow<30000)return;lastInboxShow=n;document.getElementById('inboxText').textContent=remoteCfg.inbox.text;m.classList.remove('hidden');}catch(e){}}
-function loadRemoteConfig(){try{db.collection('config').doc('settings').get().then(function(d){if(d.exists){remoteCfg=Object.assign(remoteCfg,d.data());applyRemoteConfig();applyTelegram();try{renderCurrent();}catch(e){}}else{db.collection('config').doc('settings').set(remoteCfg).catch(function(){});applyTelegram();}}).catch(function(){});}catch(e){}}
+function loadRemoteConfig(){
+  function apply(d){if(d&&d.exists){remoteCfg=Object.assign(remoteCfg,d.data());applyRemoteConfig();applyTelegram();try{renderCurrent();}catch(e){}}else{applyTelegram();}}
+  try{db.collection('config').doc('settings').get().then(apply).catch(function(){
+    fetch('https://firestore.googleapis.com/v1/projects/ra3d-bet/databases/(default)/documents/config/settings?key='+encodeURIComponent(FIREBASE_CONFIG.apiKey),{cache:'no-store'}).then(function(r){return r.ok?r.json():null;}).then(function(j){
+      if(!j||!j.fields)return;
+      var out={};Object.keys(j.fields).forEach(function(k){var v=j.fields[k]||{};if(v.stringValue!==undefined)out[k]=v.stringValue;else if(v.booleanValue!==undefined)out[k]=v.booleanValue;else if(v.integerValue!==undefined)out[k]=Number(v.integerValue);else if(v.doubleValue!==undefined)out[k]=Number(v.doubleValue);else if(v.mapValue&&v.mapValue.fields)out[k]=out[k]||{};});
+      remoteCfg=Object.assign(remoteCfg,out);applyRemoteConfig();applyTelegram();try{renderCurrent();}catch(e){}
+    }).catch(function(){});
+  });}catch(e){}
+}
 function applyRemoteConfig(){try{checkRefreshSignal();window.EB_EXTRAS=remoteCfg.extras||{};if(remoteCfg.maintenance){document.getElementById('maintenanceScreen').classList.remove('hidden');if(remoteCfg.maintenanceMsg)document.getElementById('maintenanceMsg').textContent=remoteCfg.maintenanceMsg;var sp=document.getElementById('splash');sp.classList.add('fade');setTimeout(function(){sp.classList.add('hidden');},500);return;}if(remoteCfg.banner){document.getElementById('bannerText').textContent=remoteCfg.banner;document.getElementById('bannerTop').classList.remove('hidden');}showInbox(true);if(remoteCfg.vip)document.getElementById('vipRow').classList.remove('hidden');if(remoteCfg.support&&remoteCfg.support.enabled){var b=document.getElementById('supportBtn');b.textContent=remoteCfg.support.text||'💚 ادعمنا';b.classList.remove('hidden');b.onclick=function(){try{window.open(remoteCfg.support.link,'_blank');}catch(e){}};}}catch(e){}}
 function applyTelegram(){try{var fab=document.getElementById('tgFab'),tg=remoteCfg.telegram||{};if(!fab)return;if(tg.enabled===false||!tg.link){fab.classList.add('hidden');return;}fab.href=tg.link;document.getElementById('tgFabMain').textContent=tg.mainText||'انضم لقناتنا 🔔';document.getElementById('tgFabSub').innerHTML='<span class="dot-live"></span><span>'+(tg.subText||'+2.4K')+'</span>';fab.classList.remove('hidden');}catch(e){}}
 var suggRating=0;
@@ -576,46 +585,9 @@ var hl=h.linescores||[],al=a.linescores||[];var fhH=0,fhA=0,hasHalf=false;
 if(hl.length>=1&&e.status&&e.status.type&&e.status.type.completed){hasHalf=true;fhH=Number(hl[0].displayValue||hl[0].value||0)||0;fhA=Number((al[0]||{}).displayValue||(al[0]||{}).value||0)||0;}
 return{id:e.id,date:e.date,leagueName:l.name,leagueSlug:l.slug,statusState:(e.status&&e.status.type&&e.status.type.state)||'pre',statusCompleted:!!(e.status&&e.status.type&&e.status.type.completed),live:lv,minute:lv?((e.status&&e.status.type&&e.status.type.detail)||''):'',scoreHome:h.score!=null?Number(h.score):null,scoreAway:a.score!=null?Number(a.score):null,sourceName:'ESPN',homeForm:String(h.form||''),awayForm:String(a.form||''),fhHome:fhH,fhAway:fhA,hasHalf:hasHalf,oddsHome:oH,oddsAway:oA,timeUnknown:false,home:{id:(h.team&&h.team.id)||'',name:(h.team&&h.team.displayName)||'فريق',abbr:(h.team&&h.team.abbreviation)||'',logo:(h.team&&h.team.logo)||'',record:getRec(h)},away:{id:(a.team&&a.team.id)||'',name:(a.team&&a.team.displayName)||'فريق',abbr:(a.team&&a.team.abbreviation)||'',logo:(a.team&&a.team.logo)||'',record:getRec(a)},venue:(c.venue&&c.venue.fullName)||''};}
 function getRec(c){var r=c.records||[];if(!r.length)return'';var t=r.find(function(x){return x.type==='total'||x.name==='overall';});return(t&&t.summary)||'';}
-function fetchTSDB(ds){return Promise.resolve([]);return fetchT('https://removed.invalid/api/v1/json/3/searchevents.php?d='+ds+'&s=Soccer').then(function(r){if(!r.ok)return[];return r.json();}).then(function(d){return(d.events||[]).map(function(e){return parseTSDB(e,false);}).filter(Boolean);}).catch(function(){return[];});}
-function fetchTSDBDay(ds){return Promise.resolve([]);return fetchT('https://removed.invalid/api/v1/json/3/eventsday.php?d='+ds+'&s=Soccer').then(function(r){if(!r.ok)return[];return r.json();}).then(function(d){return(d.events||[]).map(function(e){return parseTSDB(e,false);}).filter(Boolean);}).catch(function(){return[];});}
-function fetchTSDBLive(){return Promise.resolve([]);return fetchT('https://removed.invalid/api/v1/json/3/livescore.php?s=Soccer').then(function(r){if(!r.ok)return[];return r.json();}).then(function(d){return(d.events||[]).map(function(e){return parseTSDB(e,true);}).filter(Boolean);}).catch(function(){return[];});}
-function parseTSDB(e,live){if(!e||!e.idEvent)return null;var dt=new Date();var timeUnknown=false;
-if(e.strDate){var p=new Date(e.strDate+'T'+(e.strTime||'00:00:00')+'Z');if(!isNaN(p))dt=p;else timeUnknown=true;}else{timeUnknown=true;}
-if(!e.strTime)timeUnknown=true;
-var fin=!live&&(e.strStatus==='Match Finished'||e.strStatus==='FT')&&e.intHomeScore!=null;
-var liveSet={'1H':1,'2H':1,'HT':1,'ET':1,'BT':1,'INT':1,'SUSP':1,'LIVE':1,'1ST':1,'2ND':1};
-var isLive=live||(!fin&&!!liveSet[e.strStatus]);
-var slug=TSDB_SLUG[e.idLeague]||tsdbNameSlug(e.strLeague);
-if(!slug)return null;
-var name=leagueNameBySlug(slug)||TSDB_LEAGUES[e.idLeague]||e.strLeague||'دوري';
-return{id:'tsdb-'+e.idEvent,date:dt.toISOString(),leagueName:name,leagueSlug:slug,statusState:isLive?'in':(fin?'post':'pre'),statusCompleted:fin,live:isLive,minute:isLive?(e.strProgress||e.strStatus||''):'',homeForm:'',awayForm:'',fhHome:0,fhAway:0,hasHalf:false,oddsHome:null,oddsAway:null,timeUnknown:timeUnknown,scoreHome:(isLive||fin)?Number(e.intHomeScore||0):null,scoreAway:(isLive||fin)?Number(e.intAwayScore||0):null,sourceName:'API',home:{id:e.idHomeTeam||'',name:e.strHomeTeam||'فريق',abbr:'',logo:e.idHomeTeam?('https://removed.invalid/images/media/team/badge/'+e.idHomeTeam+'.png'):'',record:''},away:{id:e.idAwayTeam||'',name:e.strAwayTeam||'فريق',abbr:'',logo:e.idAwayTeam?('https://removed.invalid/images/media/team/badge/'+e.idAwayTeam+'.png'):'',record:''},venue:e.strVenue||''};}
-var APIFB_KEY='e983a918823fdba43ac9c260543cd030';
-var APIFB_MAP={233:'eg.1',307:'sa.1'};
-var APIFB_LAST={};
-function apiFbOk(tag,mins){try{var d=new Date().toISOString().slice(0,10);var o=JSON.parse(localStorage.getItem('egb_apifb')||'null');if(!o||o.d!==d)o={d:d,n:0};if(o.n>=90)return false;var now=Date.now();if(APIFB_LAST[tag]&&now-APIFB_LAST[tag]<mins*60000)return false;APIFB_LAST[tag]=now;o.n++;localStorage.setItem('egb_apifb',JSON.stringify(o));return true;}catch(e){return false;}}
-function fetchApiFb(q){return fetch('https://v3.football.api-sports.io/'+q,{headers:{'x-apisports-key':APIFB_KEY}}).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(d){try{var un=[];(d.response||[]).forEach(function(x){var nm=((x.league&&x.league.id)||'?')+':'+((x.league&&x.league.name)||'?');if(un.indexOf(nm)<0)un.push(nm);});localStorage.setItem('egb_apifb_last',JSON.stringify({q:q,n:(d.response||[]).length,lig:un.slice(0,25)}));}catch(e4){}return (d.response||[]).map(parseApiFb).filter(Boolean);}).catch(function(){try{localStorage.setItem('egb_apifb_last',JSON.stringify({q:q,n:-1}));}catch(e5){}return [];});}
-function apiFbSlugByName(n){n=(n||'').toLowerCase();if(n.indexOf('gulf')>=0)return 'gulf.cup';if(n.indexOf('africa cup')>=0||n.indexOf('afcon')>=0||(n.indexOf('cup of nations')>=0&&n.indexOf('africa')>=0))return 'caf.nations';if(n.indexOf('nations league')>=0)return 'uefa.nations';return '';}
-function parseApiFb(e){try{var lg=e.league||{},t=e.teams||{},g=e.goals||{},fx=e.fixture||{},st=fx.status||{};var slug=APIFB_MAP[lg.id]||apiFbSlugByName(lg.name);if(!slug){try{var sn=JSON.parse(localStorage.getItem('egb_apifb_seen')||'[]');var nm=(lg.id||'?')+': '+(lg.name||'?');if(sn.indexOf(nm)<0){sn.push(nm);if(sn.length>60)sn=sn.slice(-60);localStorage.setItem('egb_apifb_seen',JSON.stringify(sn));}}catch(e3){}return null;}var l=null;for(var i=0;i<LEAGUES.length;i++){if(LEAGUES[i].slug===slug){l=LEAGUES[i];break;}}if(!l)return null;var live=['1H','2H','HT','ET','BT','LIVE','INT'].indexOf(st.short)>=0;var fin=['FT','AET','PEN'].indexOf(st.short)>=0;return {id:'apifb-'+fx.id,date:fx.date,leagueName:l.name,leagueSlug:slug,statusState:fin?'post':(live?'in':'pre'),statusCompleted:fin,live:live,minute:live?String(st.elapsed||''):'',scoreHome:g.home,scoreAway:g.away,sourceName:'API-Football',homeForm:'',awayForm:'',fhHome:null,fhAway:null,hasHalf:false,oddsHome:null,oddsAway:null,timeUnknown:false,home:{id:String((t.home&&t.home.id)||''),name:(t.home&&t.home.name)||'',abbr:'',logo:(t.home&&t.home.logo)||''},away:{id:String((t.away&&t.away.id)||''),name:(t.away&&t.away.name)||'',abbr:'',logo:(t.away&&t.away.logo)||''},record:'',venue:(fx.venue&&fx.venue.name)||''};}catch(e2){return null;}}
-function demoMatches(){var fx=[['الهلال','4-2-0','النصر','3-2-1','20:00','ksa.1'],['مانشستر سيتي','4-1-1','ليفربول','4-2-0','19:00','eng.1'],['ريال مدريد','5-0-1','برشلونة','4-1-1','21:00','esp.1']];
-return fx.map(function(f,i){var d=new Date(state.date+'T'+f[4]+':00');if(isNaN(d))d=addDays(new Date(),1);if(d<=new Date())d.setDate(d.getDate()+1);var lg=LEAGUES.find(function(x){return x.slug===f[5];});return{id:'demo-'+state.date+'-'+i,date:d.toISOString(),leagueName:lg?lg.name:'دوري',leagueSlug:f[5],statusState:'pre',statusCompleted:false,live:false,minute:'',scoreHome:null,scoreAway:null,sourceName:'demo',homeForm:f[1],awayForm:f[3],fhHome:0,fhAway:0,hasHalf:false,oddsHome:null,oddsAway:null,timeUnknown:false,home:{id:'',name:f[0],abbr:f[0].slice(0,3),logo:'',record:f[1]},away:{id:'',name:f[2],abbr:f[2].slice(0,3),logo:'',record:f[3]},venue:''};});}
-function matchKey(m){var n=function(s){return (s||'').toLowerCase().replace(/\s+/g,'').replace(/(sc|fc|ac|cf|club|sports?)$/,'');};return (n(m.home.name)+'|'+n(m.away.name));}
-function dedupe(a){var m=new Map();var w=function(y){return y.live?3:(y.statusCompleted?2:1);};a.forEach(function(x){var k=matchKey(x);var o=m.get(k);if(!o){m.set(k,x);}else{if(w(x)>w(o))m.set(k,x);}});return [...m.values()];}
-function isUpcoming(m){var d=new Date(m.date);return!isNaN(d)&&d>new Date()&&!m.live&&m.statusState!=='post'&&!m.statusCompleted;}
-function isFinished(m){return !m.live&&(m.statusCompleted===true||m.status==='post'||m.status==='finished');}
-function updTeam(t,scored,conceded,isHome,ts,streakIn){
-  t.n=(t.n||0)+1;
-  var alpha=(t.n>1)?(2/(t.n+1)):1;
-  t.att=(t.att==null)?scored:(t.att+alpha*(scored-t.att));
-  t.def=(t.def==null)?conceded:(t.def+alpha*(conceded-t.def));
-  t.cs=(t.cs==null)?(conceded===0?1:0):(t.cs+alpha*((conceded===0?1:0)-t.cs));
-  t.btts=(t.btts==null)?((scored>0&&conceded>0)?1:0):(t.btts+alpha*(((scored>0&&conceded>0)?1:0)-t.btts));
-  t.o25=(t.o25==null)?((scored+conceded)>=3?1:0):(t.o25+alpha*(((scored+conceded)>=3?1:0)-t.o25));
-  t.margin=(t.margin==null)?(scored-conceded):(t.margin+alpha*((scored-conceded)-t.margin));
-  t.last=ts||Date.now();
-  t.streak=streakIn;
-  if(isHome){t.hn=(t.hn||0)+1;t.hatt=(t.hatt==null)?scored:(t.hatt+alpha*(scored-t.hatt));t.hdef=(t.hdef==null)?conceded:(t.hdef+alpha*(conceded-t.hdef));}
-  else{t.an=(t.an||0)+1;t.aatt=(t.aatt==null)?scored:(t.aatt+alpha*(scored-t.aatt));t.adef=(t.adef==null)?conceded:(t.adef+alpha*(conceded-t.adef));}
-}
+function fetchTSDB(){return Promise.resolve([]);}
+function fetchTSDBDay(){return Promise.resolve([]);}
+function fetchTSDBLive(){return Promise.resolve([]);}
 function updTeamFH(t,fhScored,fhConceded,isHome){
   t.fhn=(t.fhn||0)+1;
   var alpha=(t.fhn>1)?0.30:1;
@@ -894,50 +866,10 @@ function parseBB(e,l){try{var c=e.competitions&&e.competitions[0]||{},cs=c.compe
 function parseBBTS(e){try{if(!e||!e.idEvent)return null;var dt=new Date();var timeUnknown=false;
 if(e.strDate){var p=new Date(e.strDate+'T'+(e.strTime||'00:00:00')+'Z');if(!isNaN(p))dt=p;else timeUnknown=true;}else{timeUnknown=true;}
 if(!e.strTime)timeUnknown=true;
-var fin=(e.strStatus==='Match Finished'||e.strStatus==='FT')&&e.intHomeScore!=null;var live=!fin&&!!{'1H':1,'2H':1,'HT':1,'ET':1,'Q1':1,'Q2':1,'Q3':1,'Q4':1,'OT':1}[e.strStatus];return{id:'bbts-'+e.idEvent,date:dt.toISOString(),leagueName:e.strLeague||'كرة سلة',leagueSlug:'bb.'+(e.idLeague||'x'),statusState:live?'in':(fin?'post':'pre'),statusCompleted:fin,live:live,minute:live?(e.strProgress||e.strStatus||''):'',scoreHome:(live||fin)?+e.intHomeScore:null,scoreAway:(live||fin)?+e.intAwayScore:null,timeUnknown:timeUnknown,home:{id:e.idHomeTeam||'',name:e.strHomeTeam||'فريق',abbr:'',logo:e.idHomeTeam?('https://removed.invalid/images/media/team/badge/'+e.idHomeTeam+'.png'):''},away:{id:e.idAwayTeam||'',name:e.strAwayTeam||'فريق',abbr:'',logo:e.idAwayTeam?('https://removed.invalid/images/media/team/badge/'+e.idAwayTeam+'.png'):''}};}catch(e2){return null;}}
+var fin=(e.strStatus==='Match Finished'||e.strStatus==='FT')&&e.intHomeScore!=null;var live=!fin&&!!{'1H':1,'2H':1,'HT':1,'ET':1,'Q1':1,'Q2':1,'Q3':1,'Q4':1,'OT':1}[e.strStatus];return{id:'bbts-'+e.idEvent,date:dt.toISOString(),leagueName:e.strLeague||'كرة سلة',leagueSlug:'bb.'+(e.idLeague||'x'),statusState:live?'in':(fin?'post':'pre'),statusCompleted:fin,live:live,minute:live?(e.strProgress||e.strStatus||''):'',scoreHome:(live||fin)?+e.intHomeScore:null,scoreAway:(live||fin)?+e.intAwayScore:null,timeUnknown:timeUnknown,home:{id:e.idHomeTeam||'',name:e.strHomeTeam||'فريق',abbr:'',logo:e.idHomeTeam?'':''},away:{id:e.idAwayTeam||'',name:e.strAwayTeam||'فريق',abbr:'',logo:e.idAwayTeam?'':''}};}catch(e2){return null;}}
 function fetchBBESPN(l,ds){return fetchT('https://site.api.espn.com/apis/site/v2/sports/basketball/'+l.slug+'/scoreboard?dates='+ds).then(function(r){if(!r.ok)return[];return r.json();}).then(function(d){return(d.events||[]).map(function(e){return parseBB(e,l);}).filter(Boolean);}).catch(function(){return[];});}
-function fetchBBLive(){return Promise.resolve([]);return fetchT('https://removed.invalid/api/v1/json/3/livescore.php?s=Basketball').then(function(r){if(!r.ok)return[];return r.json();}).then(function(d){return(d.events||[]).map(parseBBTS).filter(Boolean);}).catch(function(){return[];});}
-function fetchBBDay(ds){return Promise.resolve([]);return fetchT('https://removed.invalid/api/v1/json/3/eventsday.php?d='+ds+'&s=Basketball').then(function(r){if(!r.ok)return[];return r.json();}).then(function(d){return(d.events||[]).map(parseBBTS).filter(Boolean);}).catch(function(){return[];});}
-function loadBB(){var td=fmtDate(new Date());var yd=fmtDate(addDays(new Date(),-1));var rq=[];
-BB_LEAGUES.forEach(function(l){rq.push(fetchBBESPN(l,td.replace(/-/g,'')));rq.push(fetchBBESPN(l,yd.replace(/-/g,'')));});
-rq.push(fetchBBLive());rq.push(fetchBBDay(td));rq.push(fetchBBDay(yd));
-return fetchSet(rq).then(function(list){var byKey={};list.forEach(function(g){if(!g)return;var k=(g.home.name+'|'+g.away.name).toLowerCase().replace(/\s+/g,'');var prev=byKey[k];if(!prev){byKey[k]=g;return;}var prevTs=prev.id.indexOf('bbts-')===0;var curTs=g.id.indexOf('bbts-')===0;if(prevTs&&!curTs){byKey[k]=g;}else if(prevTs&&curTs){if((g.live||g.statusCompleted)&&!(prev.live||prev.statusCompleted))byKey[k]=g;}});var out=[];Object.keys(byKey).forEach(function(k){out.push(byKey[k]);});bbMatches=out;bbTrack();if(state.view==='bball')renderBB();});}
-function bbRating(id){var t=BBADJ[id];if(t&&t.n>=2)return t;return null;}
-function bbPredict(g){var h=bbRating(g.home.id),a=bbRating(g.away.id);var L=bbAvg||108;
-var margin,total;
-if(h&&a&&h.pace&&a.pace){var netH=(h.pf-h.pa),netA=(a.pf-a.pa);margin=(netH-netA)/2+bbHCAval()*0.6;total=(h.pace*0.5+a.pace*0.5)*0.6+L*0.4;var eDiff=clamp(eloGet(BB_ELO,g.home.id)-eloGet(BB_ELO,g.away.id),-600,600);margin+=eDiff*0.02;}
-else if(h){margin=(h.pf-h.pa)*0.5+bbHCAval()*0.5;total=L;}
-else if(a){margin=-(a.pf-a.pa)*0.5+bbHCAval()*0.5;total=L;}
-else{margin=bbHCAval()*0.4;total=L;}
-var sd=clamp(Math.sqrt(bbVar||169),8,20);
-var muH=(total+margin)/2,muA=(total-margin)/2;
-var pWin=clamp(normCdf(margin/sd),0.05,0.95);
-var spreadLine=margin>=0?-3.5:3.5;
-var spreadText=margin>=0?'هانديكاب: المضيف -3.5':'هانديكاب: المضيف +3.5';
-var pSpread=margin>=0?clamp(normCdf((margin-3.5)/sd),0.05,0.95):clamp(normCdf((margin+3.5)/sd),0.05,0.95);
-var totLine=Math.round(total)-0.5;
-var sdT=sd*1.4;
-var pOver=clamp(normCdf((total-L)/sdT),0.05,0.95);
-return{muH:Math.round(muH),muA:Math.round(muA),pWin:pWin,spreadLine:spreadLine,spreadText:spreadText,pSpread:pSpread,totLine:totLine,pOver:pOver};}
-function bbTrack(){bbMatches.forEach(function(g){if(!g.statusCompleted||g.scoreHome==null||g.scoreAway==null)return;var dk='bbdone_'+g.id;if(BBADJ[dk])return;BBADJ[dk]=1;
-var pr=bbPredict(g);
-var tot=g.scoreHome+g.scoreAway;
-var h=BBADJ[g.home.id]||(BBADJ[g.home.id]={pf:0,pa:0,n:0});var a=BBADJ[g.away.id]||(BBADJ[g.away.id]={pf:0,pa:0,n:0});
-var up=function(t,pf,pa,tt){t.n=(t.n||0)+1;var al=t.n>1?0.3:1;t.pf=t.pf?t.pf+al*(pf-t.pf):pf;t.pa=t.pa?t.pa+al*(pa-t.pa):pa;t.pace=t.pace?t.pace*0.7+tt*0.3:tt;};
-up(h,g.scoreHome,g.scoreAway,tot);up(a,g.scoreAway,g.scoreHome,tot);
-bbAvg=bbAvg?bbAvg*0.8+tot*0.2:tot;
-var diff=g.scoreHome-g.scoreAway;
-bbHCA=bbHCA*0.8+diff*0.2;
-var err=diff-((pr.muH||0)-(pr.muA||0));bbVar=clamp((bbVar||169)*0.8+(err*err)*0.2,64,400);
-var S=diff>0?1:(diff===0?0.5:0);eloUpdate(BB_ELO,g.home.id,g.away.id,S,diff);
-bbSave();});}
-function teamLogoURI(t2){
-  var initials=(t2.abbr||t2.name||'??').slice(0,3).toUpperCase();
-  var colors=['#22c55e','#38bdf8','#f59e0b','#a78bfa','#ef4444','#14b8a6','#f472b6','#eab308'];
-  var c=colors[(hashCode(t2.name||'x')%colors.length)];
-  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44"><rect width="44" height="44" rx="14" fill="'+c+'22"/><circle cx="22" cy="22" r="16" fill="'+c+'33"/><text x="22" y="27" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="700" fill="'+c+'">'+initials+'</text></svg>';
-  return 'data:image/svg+xml;utf8,'+encodeURIComponent(svg);
-}
+function fetchBBLive(){return Promise.resolve([]);}
+function fetchBBDay(){return Promise.resolve([]);}
 function teamVis(t2){
   var fb=teamLogoURI(t2);
   if(t2.logo){return '<img class="logo" src="'+esc(t2.logo)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src=\''+fb+'\';">';}
@@ -2707,69 +2639,6 @@ try{
 }catch(e){}})();
 </script>
 <!-- ===== نهاية إضافة: حارس NaN v30 ===== -->
-<!-- ===== إضافة: بوابة الكؤوس v34 (قراءة الشاشة بالعين) | 2026-09-22 ===== -->
-<script>
-(function(){'use strict';try{
-  var NAMES={'\u0643\u0623\u0633 \u0627\u0644\u062E\u0644\u064A\u062C':'gulf.cup','\u0623\u0645\u0645 \u0623\u0641\u0631\u064A\u0642\u064A\u0627 \u0648\u062A\u0635\u0641\u064A\u0627\u062A\u0647\u0627':'caf.nations','\u062F\u0648\u0631\u064A \u0627\u0644\u0623\u0645\u0645 \u0627\u0644\u0623\u0648\u0631\u0648\u0628\u064A\u0629':'uefa.nations'};
-  var CUPS={
-    'gulf.cup':['Arabian Gulf Cup','Gulf Cup of Nations','Gulf Cup','Arab Gulf Cup'],
-    'caf.nations':['Africa Cup of Nations Qualification','Africa Cup of Nations','African Nations Championship'],
-    'uefa.nations':['UEFA Nations League']
-  };
-  function curSlug(){var els=document.querySelectorAll('button,div,span');for(var i=0;i<els.length;i++){var e=els[i];if(e.children.length<=1){var t=(e.textContent||'').trim();if(NAMES[t])return NAMES[t];}}return '';}
-  function curDate(){var els=document.querySelectorAll('button,div,span');for(var i=0;i<els.length;i++){var e=els[i];if(e.children.length<=1){var m=(e.textContent||'').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);if(m)return m[3]+'-'+(m[1].length<2?'0'+m[1]:m[1])+'-'+(m[2].length<2?'0'+m[2]:m[2]);}}return new Date().toISOString().slice(0,10);}
-  function j(u){return fetch(u).then(function(r){if(!r.ok)throw 0;return r.json();});}
-  function findLeague(slug){
-    var c=null;try{c=JSON.parse(localStorage.getItem('egb_cup34_'+slug)||'null');}catch(e){}
-    if(c&&Date.now()-c.ts<86400000)return Promise.resolve(c);
-    var names=CUPS[slug];var i=0;
-    var step=function(){
-      if(i>=names.length){var o={ts:Date.now(),id:'',found:'\u0645\u0634 \u0645\u0648\u062C\u0648\u062F\u0629 \u0641\u064A API'};try{localStorage.setItem('egb_cup34_'+slug,JSON.stringify(o));}catch(e){}return Promise.resolve(o);}
-      return j('https://removed.invalid/api/v1/json/3/search_leagues.php?name='+encodeURIComponent(names[i])).then(function(d){
-        var ls=d.leagues||[];
-        if(ls.length){var o={ts:Date.now(),id:ls[0].idLeague,found:ls[0].strLeague};try{localStorage.setItem('egb_cup34_'+slug,JSON.stringify(o));}catch(e){}return o;}
-        i++;return step();
-      }).catch(function(){i++;return step();});
-    };
-    return step();
-  }
-  function eventsOf(id,slug,date){
-    var ck='egb_cup34ev_'+slug+'_'+date;var c=null;try{c=JSON.parse(localStorage.getItem(ck)||'null');}catch(e){}
-    if(c&&Date.now()-c.ts<600000)return Promise.resolve(c.list);
-    return j('https://removed.invalid/api/v1/json/3/lookupleague.php?id='+id).then(function(d){
-      var list=(d.events||[]).filter(function(e){return (e.strDate||'').slice(0,10)===date;}).map(function(e){return {home:e.strHomeTeam||'',away:e.strAwayTeam||'',time:(e.strTime||'').slice(0,5),status:e.strStatus||''};});
-      try{localStorage.setItem(ck,JSON.stringify({ts:Date.now(),list:list}));}catch(e){}
-      return list;
-    }).catch(function(){return [];});
-  }
-  function container(){var host=document.querySelector('article.card');if(host&&host.parentElement)return host.parentElement;
-    var els=document.querySelectorAll('div,p');for(var i=0;i<els.length;i++){if(els[i].children.length===0&&(els[i].textContent||'').indexOf('\u0644\u0627 \u062A\u0648\u062C\u062F \u0645\u0628\u0627\u0631\u064A\u0627\u062A')>=0)return els[i].parentElement;}
-    return null;}
-  function card(html,gold){var d=document.createElement('article');d.className='card egb-cup';d.style.cssText='margin:10px 0;padding:14px;border-radius:14px;background:#0f172a;border:1px solid '+(gold?'rgba(251,191,36,.4)':'rgba(248,113,113,.4)')+';';d.innerHTML=html;return d;}
-  function run(){
-    var slug=curSlug();if(!slug)return;
-    var date=curDate();var con=container();if(!con)return;
-    var old=con.querySelectorAll('.egb-cup');for(var q=0;q<old.length;q++)old[q].remove();
-    findLeague(slug).then(function(info){
-      if(!info.id){return;con.insertBefore(card('<div style="color:#fca5a5;font-size:12px;font-weight:800;text-align:center;">\uD83D\uDD0D '+info.found+'</div>',false),con.firstChild);return;}
-      eventsOf(info.id,slug,date).then(function(list){
-        if(!list.length){con.insertBefore(card('<div style="color:#fcd34d;font-size:12px;font-weight:800;text-align:center;">\uD83C\uDFC6 \u0627\u0644\u0645\u0633\u0627\u0628\u0642\u0629 \u0645\u0648\u062C\u0648\u062F\u0629: <b>'+info.found+'</b><br>\u0628\u0633 \u0645\u0641\u064A\u0634 \u0645\u0628\u0627\u0631\u0627\u0629 \u064A\u0648\u0645 '+date+'</div>',true),con.firstChild);return;}
-        var frag=document.createDocumentFragment();
-        list.forEach(function(x){frag.appendChild(card('<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'
-          +'<b style="color:#fff;font-size:14px;flex:1;text-align:right;">'+x.home+'</b>'
-          +'<span style="color:#fbbf24;font-weight:800;font-size:13px;white-space:nowrap;">'+(x.time||'\u2014')+'</span>'
-          +'<b style="color:#fff;font-size:14px;flex:1;text-align:left;">'+x.away+'</b></div>'
-          +'<div style="margin-top:8px;text-align:center;color:#94a3b8;font-size:11px;font-weight:700;">\uD83C\uDFC6 '+info.found+' \u2022 '+(x.status||'\u0644\u0645 \u062A\u0628\u062F\u0623')+'</div>',true));});
-        con.insertBefore(frag,con.firstChild);
-        var els=con.querySelectorAll('div,p');for(var i=0;i<els.length;i++){if(els[i].children.length===0&&(els[i].textContent||'').indexOf('\u0644\u0627 \u062A\u0648\u062C\u062F \u0645\u0628\u0627\u0631\u064A\u0627\u062A')>=0){els[i].style.display='none';break;}}
-      });
-    });
-  }
-  setTimeout(run,2000);setInterval(run,8000);
-  document.addEventListener('click',function(){setTimeout(run,800);});
-}catch(e){console.warn('[RA3D_BET Addon] cups-v34:',e);}})();
-</script>
-<!-- ===== نهاية إضافة: بوابة الكؤوس v34 ===== -->
 <!-- ===== إضافة: الدرع السحابي ESPN v37 (ثبات لكل المستخدمين) | 2026-09-23 ===== -->
 <script>
 (function(){'use strict';try{
@@ -3260,32 +3129,6 @@ try{
 }catch(e){console.warn('[RA3D_BET Addon] stick-v51:',e);}})();
 </script>
 <!-- ===== نهاية إضافة: اللايف اللاصق لحد الصافرة v51 ===== -->
-<!-- ===== إضافة: التأمين الشامل v62 | 2026-09-25 ===== -->
-<script>
-(function(){'use strict';try{
-  var EMPTY='{"events":null,"event":null,"teams":null,"players":null,"leagues":null,"results":null}';
-  var of=window.fetch;
-  window.fetch=function(u,o){var url=(typeof u==='string')?u:((u&&u.url)||'');
-    if(/thesportsdb\.com/i.test(url))return Promise.resolve(new Response(EMPTY,{status:200,headers:{'Content-Type':'application/json'}}));
-    return of.apply(this,arguments);};
-  var ox=XMLHttpRequest.prototype.open;
-  XMLHttpRequest.prototype.open=function(m,url){try{if(/thesportsdb\.com/i.test(url+''))arguments[1]='data:application/json,'+EMPTY;}catch(e){}return ox.apply(this,arguments);};
-  ['fetchTSDB','fetchTSDBDay','fetchTSDBLive','fetchBBLive','fetchBBDay'].forEach(function(fn){
-    try{if(typeof window[fn]==='function')window[fn]=function(){return Promise.resolve([]);};}catch(e){}
-  });
-  var PH=['مش موجودة في TheSportsDB','مش موجودة في API'];
-  var last=0;
-  function sweep(){var n=Date.now();if(n-last<800)return;last=n;
-    try{var all=document.querySelectorAll('div,section,p,span,b,strong');
-      for(var i=0;i<all.length;i++){var el=all[i];if(el.__hid)continue;var t=(el.textContent||'').trim();
-        if(t.length<80&&PH.some(function(p){return t.indexOf(p)>=0;})){el.style.display='none';el.__hid=1;
-          var pa=el.parentElement;if(pa&&(pa.textContent||'').trim().length<80){pa.style.display='none';pa.__hid=1;}}}}catch(e){}}
-  setInterval(sweep,1500);
-  try{new MutationObserver(function(){sweep();}).observe(document.body,{childList:true,subtree:true});}catch(e){}
-  console.info('[RA3D_BET Addon] audit-v62: التأمين الشامل شغال');
-}catch(e){console.warn('[RA3D_BET Addon] audit-v62:',e);}})();
-</script>
-<!-- ===== نهاية إضافة: التأمين الشامل v62 ===== -->
 <!-- ===== إضافة: حد اليوم الشامل v68 | 2026-09-25 ===== -->
 <script>
 (function(){'use strict';try{
