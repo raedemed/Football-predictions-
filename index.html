@@ -576,7 +576,7 @@ if(state.date!==td){var co=state.league==='all'?LEAGUES.filter(function(l){retur
 return rq;}
 function activeLeagues(){return state.league==='all'?LEAGUES:LEAGUES.filter(function(l){return l.slug===state.league;});}
 function americanToDecimal(a){if(a==null||a==='')return null;a=Number(a);if(isNaN(a))return null;return a>0?+(1+a/100).toFixed(2):+(1+100/Math.abs(a)).toFixed(2);}
-function fetchESPN(l,ds){return fetchT('https://site.api.espn.com/apis/site/v2/sports/soccer/'+l.slug+'/scoreboard?dates='+ds).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(d){return(d.events||[]).map(function(e){return parseESPN(e,l);});});}
+function fetchESPN(l,ds){var u='https://site.api.espn.com/apis/site/v2/sports/soccer/'+l.slug+'/scoreboard?dates='+ds;return fetchT(u).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status+' — '+l.slug);return r.json();}).then(function(d){return(d.events||[]).map(function(e){return parseESPN(e,l);});});}
 function parseESPN(e,l){var c=e.competitions&&e.competitions[0]||{},cs=c.competitors||[];var h=cs.find(function(x){return x.homeAway==='home';})||cs[0]||{},a=cs.find(function(x){return x.homeAway==='away';})||cs[1]||{};var lv=e.status&&e.status.type&&e.status.type.state==='in';
 var od=(c.odds&&c.odds[0])||null;var oH=null,oA=null;
 if(od){if(od.homeTeamOdds&&od.homeTeamOdds.moneyLine!=null)oH=americanToDecimal(od.homeTeamOdds.moneyLine);else if(od.moneyline&&od.moneyline.home!=null)oH=americanToDecimal(od.moneyline.home);
@@ -3198,8 +3198,8 @@ try{
           var ys=dstr(new Date(Date.now()-86400000)),ts=dstr(new Date(Date.now()+86400000));
           uniq.forEach(function(slug){
             if(typeof window.fetchESPN==='function'){
-              rq.push(window.fetchESPN({slug:slug},ys));
-              rq.push(window.fetchESPN({slug:slug},ts));
+              rq.push(Promise.resolve(window.fetchESPN({slug:slug},ys)).catch(function(){return[];}));
+              rq.push(Promise.resolve(window.fetchESPN({slug:slug},ts)).catch(function(){return[];}));
             }
           });
         }
