@@ -881,6 +881,58 @@ function matchTimeLabel(m){
   if(m.timeUnknown)return 'التوقيت يُعلن لاحقاً';
   return new Intl.DateTimeFormat('ar-EG',{weekday:'long',hour:'2-digit',minute:'2-digit'}).format(d);
 }
+function loadBB(){var td=fmtDate(new Date());var yd=fmtDate(addDays(new Date(),-1));var rq=[];
+BB_LEAGUES.forEach(function(l){rq.push(fetchBBESPN(l,td.replace(/-/g,'')));rq.push(fetchBBESPN(l,yd.replace(/-/g,'')));});
+rq.push(fetchBBLive());rq.push(fetchBBDay(td));rq.push(fetchBBDay(yd));
+return fetchSet(rq).then(function(list){var byKey={};list.forEach(function(g){if(!g)return;var k=(g.home.name+'|'+g.away.name).toLowerCase().replace(/\s+/g,'');var prev=byKey[k];if(!prev){byKey[k]=g;return;}var prevTs=prev.id.indexOf('bbts-')===0;var curTs=g.id.indexOf('bbts-')===0;if(prevTs&&!curTs){byKey[k]=g;}else if(prevTs&&curTs){if((g.live||g.statusCompleted)&&!(prev.live||prev.statusCompleted))byKey[k]=g;}});var out=[];Object.keys(byKey).forEach(function(k){out.push(byKey[k]);});bbMatches=out;bbTrack();if(state.view==='bball')renderBB();});}
+function bbRating(id){var t=BBADJ[id];if(t&&t.n>=2)return t;return null;}
+function bbPredict(g){var h=bbRating(g.home.id),a=bbRating(g.away.id);var L=bbAvg||108;
+var margin,total;
+if(h&&a&&h.pace&&a.pace){var netH=(h.pf-h.pa),netA=(a.pf-a.pa);margin=(netH-netA)/2+bbHCAval()*0.6;total=(h.pace*0.5+a.pace*0.5)*0.6+L*0.4;var eDiff=clamp(eloGet(BB_ELO,g.home.id)-eloGet(BB_ELO,g.away.id),-600,600);margin+=eDiff*0.02;}
+else if(h){margin=(h.pf-h.pa)*0.5+bbHCAval()*0.5;total=L;}
+else if(a){margin=-(a.pf-a.pa)*0.5+bbHCAval()*0.5;total=L;}
+else{margin=bbHCAval()*0.4;total=L;}
+var sd=clamp(Math.sqrt(bbVar||169),8,20);
+var muH=(total+margin)/2,muA=(total-margin)/2;
+var pWin=clamp(normCdf(margin/sd),0.05,0.95);
+var spreadLine=margin>=0?-3.5:3.5;
+var spreadText=margin>=0?'هانديكاب: المضيف -3.5':'هانديكاب: المضيف +3.5';
+var pSpread=margin>=0?clamp(normCdf((margin-3.5)/sd),0.05,0.95):clamp(normCdf((margin+3.5)/sd),0.05,0.95);
+var totLine=Math.round(total)-0.5;
+var sdT=sd*1.4;
+var pOver=clamp(normCdf((total-L)/sdT),0.05,0.95);
+return{muH:Math.round(muH),muA:Math.round(muA),pWin:pWin,spreadLine:spreadLine,spreadText:spreadText,pSpread:pSpread,totLine:totLine,pOver:pOver};}
+function bbTrack(){bbMatches.forEach(function(g){if(!g.statusCompleted||g.scoreHome==null||g.scoreAway==null)return;var dk='bbdone_'+g.id;if(BBADJ[dk])return;BBADJ[dk]=1;
+var pr=bbPredict(g);
+var tot=g.scoreHome+g.scoreAway;
+var h=BBADJ[g.home.id]||(BBADJ[g.home.id]={pf:0,pa:0,n:0});var a=BBADJ[g.away.id]||(BBADJ[g.away.id]={pf:0,pa:0,n:0});
+var up=function(t,pf,pa,tt){t.n=(t.n||0)+1;var al=t.n>1?0.3:1;t.pf=t.pf?t.pf+al*(pf-t.pf):pf;t.pa=t.pa?t.pa+al*(pa-t.pa):pa;t.pace=t.pace?t.pace*0.7+tt*0.3:tt;};
+up(h,g.scoreHome,g.scoreAway,tot);up(a,g.scoreAway,g.scoreHome,tot);
+bbAvg=bbAvg?bbAvg*0.8+tot*0.2:tot;
+var diff=g.scoreHome-g.scoreAway;
+bbHCA=bbHCA*0.8+diff*0.2;
+var err=diff-((pr.muH||0)-(pr.muA||0));bbVar=clamp((bbVar||169)*0.8+(err*err)*0.2,64,400);
+var S=diff>0?1:(diff===0?0.5:0);eloUpdate(BB_ELO,g.home.id,g.away.id,S,diff);
+bbSave();});}
+function teamLogoURI(t2){
+  var initials=(t2.abbr||t2.name||'??').slice(0,3).toUpperCase();
+  var colors=['#22c55e','#38bdf8','#f59e0b','#a78bfa','#ef4444','#14b8a6','#f472b6','#eab308'];
+  var c=colors[(hashCode(t2.name||'x')%colors.length)];
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44"><rect width="44" height="44" rx="14" fill="'+c+'22"/><circle cx="22" cy="22" r="16" fill="'+c+'33"/><text x="22" y="27" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="700" fill="'+c+'">'+initials+'</text></svg>';
+  return 'data:image/svg+xml;utf8,'+encodeURIComponent(svg);
+}
+function teamVis(t2){
+  var fb=teamLogoURI(t2);
+  if(t2.logo){return '<img class="logo" src="'+esc(t2.logo)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src=\''+fb+'\';">';}
+  return '<img class="logo" src="'+fb+'" alt="">';
+}
+function matchTimeLabel(m){
+  var d=new Date(m.date);
+  if(isNaN(d))return '—';
+  if(m.timeUnknown)return 'التوقيت يُعلن لاحقاً';
+  return new Intl.DateTimeFormat('ar-EG',{weekday:'long',hour:'2-digit',minute:'2-digit'}).format(d);
+}
+
 function renderBB(){var el=document.getElementById('bbContent');if(!el)return;
 var nowTs=Date.now();
 var live=bbMatches.filter(function(g){return g.live;});
