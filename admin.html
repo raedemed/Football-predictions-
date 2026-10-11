@@ -620,22 +620,6 @@ async function clearChat(){
   document.addEventListener('click',function(e){if(e.target&&e.target.id==='clearChatBtn')clearChat();if(e.target&&e.target.id==='adminChatSend')sendAdminChat();});document.addEventListener('keydown',function(e){if(e.target&&e.target.id==='adminChatInput'&&e.key==='Enter')sendAdminChat();});
 })();
 </script>
-<script>
-(function(){try{
-  if(localStorage.getItem('egb_mig1'))return;
-  localStorage.setItem('egb_mig1','1');
-  fetch('./config.json?ts='+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(j){
-    if(!j||!j.users||!j.users.length)return;
-    db.collection('users').get().then(function(snap){
-      var have={};snap.forEach(function(d){have[d.data().u]=1;});
-      var chain=Promise.resolve();
-      j.users.forEach(function(u){
-        if(have[u.u])return;
-        chain=chain.then(function(){return db.collection('users').add({u:u.u,h:u.h,createdAt:Date.now(),migrated:true});});
-      });
-    });
-  }).catch(function(){});
-}catch(e){}})();
-</script>
+
 </body>
 </html>
