@@ -396,7 +396,20 @@ var TSDB_NAME=[['caf champions','caf.champions'],['afc champions','afc.champions
 function tsdbNameSlug(s){if(!s)return null;var ln=String(s).toLowerCase();for(var i=0;i<TSDB_NAME.length;i++){if(ln.indexOf(TSDB_NAME[i][0])>=0)return TSDB_NAME[i][1];}return null;}
 function leagueNameBySlug(sl){var l=null;for(var i=0;i<LEAGUES.length;i++){if(LEAGUES[i].slug===sl){l=LEAGUES[i];break;}}return l?l.name:null;}
 var KNOWN={};LEAGUES.forEach(function(l){KNOWN[l.slug]=1;});
-function isKnown(m){return !!KNOWN[m.leagueSlug];}
+function isFinished(m){
+  if(!m)return false;
+  var st=String(m.statusState||m.status||'').toLowerCase();
+  if(m.statusCompleted||st==='post'||st==='final'||st==='finished'||st==='complete')return true;
+  return m.scoreHome!=null&&m.scoreAway!=null&&new Date(m.date).getTime()<Date.now()-15*60*1000;
+}
+function isUpcoming(m){
+  if(!m||isFinished(m)||m.live)return false;
+  var t=new Date(m.date).getTime();
+  if(!isFinite(t))return false;
+  return t>=Date.now()-15*60*1000;
+}
+function isLive(m){return !!(m&&m.live&&!isFinished(m));}
+function isKnown(m){return !!(m&&KNOWN[m.leagueSlug]);}
 var DEF_LEAGUE={home:1.50,away:1.20};
 var SAFE_TOP=5;
 var THR=lsGet('eb_thr')||{btts:65,h1:68};
