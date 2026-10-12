@@ -597,7 +597,7 @@ if(state.mode==='live'){LIVE_SLUGS.forEach(function(sl){var l=LEAGUES.find(funct
 else{var sel=activeLeagues();sel.forEach(function(l){if(!l.apifbOnly)rq.push(fetchESPN(l,state.date.replace(/-/g,'')));});rq.push(fetchTSDBDay(state.date));addAm();if(apiFbOk('day:'+state.date,30))rq.push(fetchApiFb('fixtures?date='+state.date));
 if(state.date!==td){var co=state.league==='all'?LEAGUES.filter(function(l){return CORE_SLUGS.indexOf(l.slug)>=0;}):sel;co.forEach(function(l){rq.push(fetchESPN(l,td.replace(/-/g,'')));});rq.push(fetchTSDBDay(td));}}
 return rq;}
-function activeLeagues(){return state.league==='all'?LEAGUES:LEAGUES.filter(function(l){return l.slug===state.league;});}
+function activeLeagues(){if(state.league!=='all')return LEAGUES.filter(function(l){return l.slug===state.league;});var seen={},slugs=CORE_SLUGS.concat(AMER_SLUGS);return LEAGUES.filter(function(l){if(seen[l.slug]||slugs.indexOf(l.slug)<0)return false;seen[l.slug]=1;return true;});}
 function americanToDecimal(a){if(a==null||a==='')return null;a=Number(a);if(isNaN(a))return null;return a>0?+(1+a/100).toFixed(2):+(1+100/Math.abs(a)).toFixed(2);}
 function fetchESPN(l,ds){var u='https://site.api.espn.com/apis/site/v2/sports/soccer/'+l.slug+'/scoreboard?dates='+ds;return fetchT(u).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status+' — '+l.slug);return r.json();}).then(function(d){return(d.events||[]).map(function(e){return parseESPN(e,l);}).filter(Boolean);}).catch(function(){return[];});}
 function parseESPN(e,l){var c=e.competitions&&e.competitions[0]||{},cs=c.competitors||[];var h=cs.find(function(x){return x.homeAway==='home';})||cs[0]||{},a=cs.find(function(x){return x.homeAway==='away';})||cs[1]||{};var lv=e.status&&e.status.type&&e.status.type.state==='in';
