@@ -276,7 +276,7 @@ setTimeout(function(){
 </header>
 <section class="controls">
 <div class="mode-row"><button class="chip mode-chip active" data-mode="all">🌐 الكل (قادمة)</button><button class="chip mode-chip" data-mode="live">🔴 لايف</button><button class="chip mode-chip" data-mode="finished">⚪ انتهت</button></div>
-<div class="date-row" id="dateRow"><button class="chip date-chip" data-offset="0">اليوم</button><button class="chip date-chip active" data-offset="1">غداً</button><button class="chip date-chip" data-offset="2">بعد غد</button><input id="datePicker" type="date"/></div>
+<div class="date-row" id="dateRow"><button class="chip date-chip active" data-offset="0">اليوم</button><button class="chip date-chip" data-offset="1">غداً</button><button class="chip date-chip" data-offset="2">بعد غد</button><input id="datePicker" type="date"/></div>
 <div class="date-row hidden" id="finRow"><button class="chip fin-chip" data-span="1">أمس</button><button class="chip fin-chip active" data-span="3">آخر 3 أيام</button><button class="chip fin-chip" data-span="7">آخر 7 أيام</button><input id="finDate" type="date"/></div>
 <div class="filters-row"><select id="leagueSelect"></select><input id="search" type="search" placeholder="ابحث عن فريق أو دوري..."/></div>
 </section>
@@ -429,7 +429,7 @@ function eloSave(){if(eloPend)return;eloPend=true;setTimeout(function(){eloPend=
 function eloGet(store,id){var t=store[id];return(t&&t.r)?t.r:1500;}
 function movMult(diff){return Math.min(2.2,Math.log(Math.abs(diff)+1)*1.2+0.6);}
 function eloUpdate(store,idH,idA,S,diff){var rH=eloGet(store,idH),rA=eloGet(store,idA);var E=1/(1+Math.pow(10,(rA-rH)/400));var K=20*movMult(diff);var d=K*(S-E);store[idH]={r:clamp(rH+d,900,2100),n:((store[idH]&&store[idH].n)||0)+1,last:Date.now()};store[idA]={r:clamp(rA-d,900,2100),n:((store[idA]&&store[idA].n)||0)+1,last:Date.now()};}
-var state={date:fmtDate(addDays(new Date(),1)),league:'all',query:'',view:'home',prevView:'home',mode:'all',matches:[],source:'loading',sourcesOk:[],autoRefresh:true,notifEnabled:true,detailsId:null,prevLive:null,finSpan:3,finDate:fmtDate(new Date()),finDatePicked:false,vip:false,markets:{goals:true,safe:true,u15:true,u25:true,o25:true,dc1:true,dc2:true,corners:true,cornersOver:true,cornersUnder:true,handicap:true,btts:true,win:true}};
+var state={date:fmtDate(new Date()),league:'all',query:'',view:'home',prevView:'home',mode:'all',matches:[],source:'loading',sourcesOk:[],autoRefresh:true,notifEnabled:true,detailsId:null,prevLive:null,finSpan:3,finDate:fmtDate(new Date()),finDatePicked:false,vip:false,markets:{goals:true,safe:true,u15:true,u25:true,o25:true,dc1:true,dc2:true,corners:true,cornersOver:true,cornersUnder:true,handicap:true,btts:true,win:true}};
 var started=false;
 init();
 function init(){
@@ -3003,44 +3003,7 @@ try{
 }catch(e){console.warn('[RA3D_BET Addon] fix-v45:',e);}})();
 </script>
 <!-- ===== نهاية إضافة: إصلاح المنتخبات v45 ===== -->
-<!-- ===== إضافة: كوبري اللايف عبر منتصف الليل v46 | 2026-09-24 ===== -->
-<script>
-(function(){'use strict';try{
-  var of=window.fetch;
-  function dstr(d){return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');}
-  window.fetch=function(u,o){
-    var url=(typeof u==='string')?u:((u&&u.url)||'');
-    var m=url.match(/[?&]dates=(\d{8})/)||url.match(/scoreboard\/(\d{8})/);
-    var p=of.apply(this,arguments);
-    if(!m)return p;
-    var today=dstr(new Date());
-    var hour=new Date().getHours();
-    if(m[1]!==today||hour>=12)return p;
-    var yurl=url.replace(m[1],dstr(new Date(Date.now()-86400000)));
-    return p.then(function(r){
-      return r.text().then(function(txt){
-        return of(yurl,o).then(function(r2){
-          if(!r2.ok)return new Response(txt,{status:200,headers:{'Content-Type':'application/json'}});
-          return r2.text().then(function(txt2){
-            try{
-              var j=JSON.parse(txt),j2=JSON.parse(txt2);
-              var evs=j.events||[],ids={};
-              evs.forEach(function(e){ids[e.id]=1;});
-              (j2.events||[]).forEach(function(e){
-                if(!ids[e.id]&&e.status&&e.status.type&&e.status.type.state==='in')evs.push(e);
-              });
-              j.events=evs;
-              return new Response(JSON.stringify(j),{status:200,headers:{'Content-Type':'application/json'}});
-            }catch(e){return new Response(txt,{status:200,headers:{'Content-Type':'application/json'}});}
-          });
-        }).catch(function(){return new Response(txt,{status:200,headers:{'Content-Type':'application/json'}});});
-      });
-    });
-  };
-  console.info('[RA3D_BET Addon] bridge-v46: كوبري اللايف شغال');
-}catch(e){console.warn('[RA3D_BET Addon] bridge-v46:',e);}})();
-</script>
-<!-- ===== نهاية إضافة: كوبري اللايف v46 ===== -->
+
 <!-- ===== إضافة: سياسة الأسواق الآمنة v47 | 2026-09-24 ===== -->
 <script>
 (function(){'use strict';try{
@@ -3204,36 +3167,7 @@ try{
 }catch(e){console.warn('[RA3D_BET Addon] stick-v51:',e);}})();
 </script>
 <!-- ===== نهاية إضافة: اللايف اللاصق لحد الصافرة v51 ===== -->
-<!-- ===== إضافة: حد اليوم الشامل v68 | 2026-09-25 ===== -->
-<script>
-(function(){'use strict';try{
-  function dstr(d){return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');}
-  var br=window.buildRequests;
-  if(typeof br==='function'){
-    window.buildRequests=function(){
-      var rq=br.apply(this,arguments);
-      try{
-        if(!window.__xdatesDone){
-          window.__xdatesDone=1;
-          var seen={};var uniq=[];
-          (window.CORE_SLUGS||[]).concat(window.LIVE_SLUGS||[]).forEach(function(s){if(s&&!seen[s]){seen[s]=1;uniq.push(s);}});
-          uniq=uniq.slice(0,24);
-          var ys=dstr(new Date(Date.now()-86400000)),ts=dstr(new Date(Date.now()+86400000));
-          uniq.forEach(function(slug){
-            if(typeof window.fetchESPN==='function'){
-              rq.push(Promise.resolve(window.fetchESPN({slug:slug},ys)).catch(function(){return[];}));
-              rq.push(Promise.resolve(window.fetchESPN({slug:slug},ts)).catch(function(){return[];}));
-            }
-          });
-        }
-      }catch(e){}
-      return rq;
-    };
-  }
-  console.info('[RA3D_BET Addon] bound-v68: حد اليوم الشامل نشط');
-}catch(e){console.warn('[RA3D_BET Addon] bound-v68:',e);}})();
-</script>
-<!-- ===== نهاية إضافة: حد اليوم الشامل v68 ===== -->
+
 <!-- ===== إضافة: أرشيف المنتهية الشامل v26 | 2026-09-25 ===== -->
 <script>
 (function(){'use strict';try{
